@@ -1,25 +1,246 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "My first R Markdown project"
+author: "Arturo Carrión"
+date: "30 de enero de 2020"
+output: "html_document"
 ---
 
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+###Loading and processing the data
 
+First we will load the data from the working directory (previously downloaded).
 
+```{r data}
+#Reading the data
+data <- read.csv("C:/Users/arturo/Desktop/curso de coursera/Data Science/Reproducible Research/activity.csv",sep = ",",header = TRUE)
 
-## What is mean total number of steps taken per day?
+#Transforming date into date class object
+data$date <- as.Date(data$date)
+head(data)
+```
 
+###What is the mean of the total number of steps taken per day?
 
+For this part of the assignment, you can ignore the missing values in the dataset.
 
-## What is the average daily activity pattern?
+First we will Calculate the total number of steps taken per day.
 
+```{r steps, warning=FALSE}
+library(dplyr)
+steps_taken <- data %>% 
+        group_by(date) %>% 
+        summarise(steps = sum(steps,na.rm = TRUE))
+print(steps_taken)
 
+rows <- nrow(steps_taken)
+```
 
-## Imputing missing values
+We can see that there is **`r rows`** days in the dataset corresponding to october and november.
 
+Now we will make a histogram with the total number of steps taken each day
 
+```{r histogram}
+library(ggplot2)
+#Creating a pallete of colors
+BB <- colorRampPalette(c("Blue","black"),space="Lab")
 
-## Are there differences in activity patterns between weekdays and weekends?
+#Plotting
+g <- ggplot(data = steps_taken,aes(x=steps))
+        p = g + geom_histogram(bins = 5,fill = c(BB(5))) + 
+                ggtitle("Total of steps taken each day") + 
+                xlab("Steps taken") + theme_bw()
+print(p)
+```
+
+We can see that the max amount of steps taken in all days is around the ten thounsand. Let's see what is the mean and the median of the total number of steps taken each day.
+
+```{r mean and median}
+#Calulating the mean
+steps_mean <- mean(steps_taken$steps,na.rm = TRUE)
+        steps_mean_round <- as.numeric(round(steps_mean,0))
+
+#Calculating the median
+steps_median <- median(steps_taken$steps,na.rm = TRUE)
+```
+
+So, the mean of the steps taken each day is **`r format(steps_mean_round,scientific = FALSE)`** and the median is **`r steps_median`**, like we saw before with the histogram, they are around the ten thousand of steps each day.
+
+###What is the average daily activity pattern?
+
+Let's make a time series plot of the average number of steps taken across all days.
+
+So, First we calculate the average of steps taken each day.
+
+```{r average steps}
+steps_average <- data %>% 
+        group_by(interval) %>% 
+        summarise(average = mean(steps,na.rm = TRUE))
+print(steps_average)
+```
+
+Then we make the time series plot
+
+```{r time series plot}
+T <- ggplot(steps_average,aes(interval,average))
+       t = T + geom_line(colour = BB(288)) + 
+               ggtitle("Average of steps taken by interval of 5-minutes")+ 
+               xlab("Interval of 5-minutes")+ylab("Average of steps taken")+ theme_bw()
+       
+print(t)
+```
+
+Which interval has the maximun amount of steps taken across all days?
+
+```{r Max interval steps}
+#Finding the Max steps into the interval and the amount of that max steps
+Max_interval <- steps_average$interval[which.max(steps_average$average)]
+Max_steps <- round(steps_average$average[which.max(steps_average$average)],0)
+
+#Creating the hour to putting the inline code
+library(lubridate)
+min <- minutes(Max_interval)
+per <- period_to_seconds(min)
+hour_day <- seconds_to_period(per)
+hour_day2 <- as.POSIXct(hour_day,origin = "2020-02-02 UTC",tz="GMT")
+hour_day3 <- format.POSIXct(hour_day2,format = "%r")
+```
+
+So, the Interval with the maximun amount of steps taken across all days is **`r Max_interval`** which means that is at **`r hour_day3`** Having an average of **`r Max_steps`** steps taken across all days.
+
+###Imputing missing values
+
+Now we will calculate and report the total number of missing values in the data set.
+
+```{r Missing values}
+miss_steps <- sum(is.na(data$steps))
+```
+
+We can see that there's **`r miss_steps`** missing values.
+
+Now, we need to fill those missing values. To do that we will take the average of steps taken in each interval and then fill the data with those values.
+
+```{r filling the data}
+fill_NA <- data 
+
+for (i in 1:nrow(fill_NA)) { 
+        if(is.na(fill_NA$steps[i])) {
+#Find the index value for when the interval marches the average
+                find_NA <- which(fill_NA$interval[i] == steps_average$interval)
+#Assign the value to replace the NA
+                fill_NA$steps[i] <- steps_average[find_NA,]$average
+        }
+}
+
+#Making sure that the date variable is still a date class object
+fill_NA$date <- as.Date(fill_NA$date)
+
+#testing that the result has no NA's
+test_fill_NA <- is.na(fill_NA)
+summary(test_fill_NA)
+```
+
+We can see that there is no more NA's in the dataset. 
+
+Let's see how are the steps taken each day in the new data.
+
+```{r steps fill, warning=FALSE}
+library(dplyr)
+steps_taken_fill <- fill_NA %>% 
+        group_by(date) %>% 
+        summarise(steps = sum(steps))
+print(steps_taken_fill)
+
+rows_fill <- nrow(steps_taken_fill)
+```
+
+We can see that there's still **`r rows_fill`** days in the dataset corresponding to october and november.
+
+Now we will make a histogram.
+
+```{r histogram fill}
+library(ggplot2)
+#Creating a pallete of colors
+GB <- colorRampPalette(c("green","black"),space="Lab")
+
+#Plotting
+N <- ggplot(data = steps_taken_fill,aes(x=steps))
+        n = N + geom_histogram(bins = 5,fill = c(GB(5))) + 
+                ggtitle("Total of steps taken each day") + 
+                xlab("Steps taken") + theme_bw()
+print(n)
+```
+
+We can see that the amount of steps taken each day is around the ten thounsand steps each day. Let's see what is the mean and the median of the total number of steps taken each day.
+
+```{r mean and median fill}
+#Calulating the mean
+steps_mean_fill <- mean(steps_taken_fill$steps)
+        steps_mean_round_fill <- as.numeric(round(steps_mean_fill,0))
+
+#Calculating the median
+steps_median_fill <- median(steps_taken_fill$steps)
+        steps_median_round_fill <- as.numeric(round(steps_median_fill,0))
+```
+
+So, the mean of the steps taken each day is **`r format(steps_mean_round_fill,scientific = FALSE)`** and the median is **`r format(steps_median_round_fill,scientific = FALSE)`**, like we saw before with the histogram, they are around the ten thousand of steps each day.
+
+Looks like there's a slightly difference between the first data and the filled one. But let's make the comparison.
+
+```{r data plot comparison}
+#Let's see the plots
+print(p)
+print(n)
+```
+
+There is a difference in the first bar but the the max amount of steps taken in all days is still around the ten thousand.
+
+The mean and median of the first data are **`r format(steps_mean_round,scientific = FALSE)`**,  **`r steps_median`**, and the mean and median of the filled one are **`r format(steps_mean_round_fill,scientific = FALSE)`**,**`r format(steps_median_round_fill,scientific = FALSE)`**. Either the mean and the median of the filled one are higher than the original.
+
+###Are there differences in activity patterns between weekdays and weekends?
+
+Let's see the trend of the steps taken by days but, this time we will make difference between weekdays and weekends.
+
+First, let's create a variable to identify every day of the week
+
+```{r weekdays and weekends}
+fill_NA$weekdays <- weekdays(fill_NA$date)
+head(fill_NA)
+```
+
+Now that we know the weekdays of every day, let's separate them into weekdays and weekend.
+
+```{r weekend variable}
+#First categorize the normal weekdays
+fill_NA$wknd <- fill_NA$wknd <- "Weekday"
+
+#Now, determine the weekend days
+fill_NA$wknd[fill_NA$weekdays %in% c("sábado","domingo")] <- "Weekend"
+```
+
+Now that we have the days of the week categorized, let's see the average between them.~~(sorry for the spanish, don't know why that appear like that)~~
+
+```{r weekend average}
+week_average <- fill_NA %>% 
+        group_by(wknd,interval) %>% 
+        summarise(average = mean(steps))
+print(week_average)
+```
+
+Let's make a plot to see the difference between weekdays and weekend
+
+```{r weekend plot}
+
+W <- ggplot(week_average,aes(interval,average))
+        w = W + geom_line(colour=c(BB(288),GB(288)))+ facet_grid(wknd~.)+ 
+                ggtitle("Steps taken by weekdays")+xlab("Steps taken")+
+                theme_bw()
+                
+print(w)
+```
+        
+We can see that in average the trend of the weeknds is a little bit higher than the weekdays.
+
+#THE END
